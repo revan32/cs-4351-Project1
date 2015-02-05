@@ -10,6 +10,9 @@ import ErrorMsg.ErrorMsg;
 
 %{
 int comments = 0;
+StringBuffer string;
+int in_string=0;
+
 private void newline() {
   errorMsg.newline(yychar);
 }
@@ -46,7 +49,8 @@ Yylex(java.io.InputStream s, ErrorMsg e) {
 %eofval} 
 
 comment_text=([^/*\n]|[^*\n]"/"[^*\n]|[^/\n]"*"[^/\n]|"*"[^/\n]|"/"[^*\n])*
-%state COMMENT      
+3digits=[0-9][0-9][0-9]
+%state COMMENT STRING
 
 
 %%
@@ -59,12 +63,17 @@ comment_text=([^/*\n]|[^*\n]"/"[^*\n]|[^/\n]"*"[^/\n]|"*"[^/\n]|"/"[^*\n])*
 <COMMENT>"*/"			{if (--comments == 0) { yybegin(YYINITIAL); }}
 
 
+
 \t				{     }
+\\{3digits}[0-9]+	{Integer ascin= new Integer(yytext().substring(1, yytext().length()));
+				return tok(sym.STRING, ascin.shortValue());}
+
+
 "while" 			{return tok(sym.WHILE, null);}
 "for"				{return tok(sym.FOR, null);}
 "to"				{return tok(sym.TO, null);}
 "break"			{return tok(sym.BREAK, null);}
-<YYINITIAL>let		{return tok(sym.LET, null);}
+"let"				{return tok(sym.LET, null);}
 "in"				{return tok(sym.IN, null);}
 "end"				{return tok(sym.END, null);}
 "function"			{return tok(sym.FUNCTION, null);}
@@ -81,6 +90,7 @@ comment_text=([^/*\n]|[^*\n]"/"[^*\n]|[^/\n]"*"[^/\n]|"*"[^/\n]|"/"[^*\n])*
 
 ","				{return tok(sym.COMMA, null);}
 "("				{return tok(sym.LPAREN, null);}
+")"				{return tok(sym.RPAREN, null);}
 "="				{return tok(sym.EQ, null);}
 "&"				{return tok(sym.AND, null);}   
 "+"				{return tok(sym.PLUS, null);} 
@@ -103,7 +113,10 @@ comment_text=([^/*\n]|[^*\n]"/"[^*\n]|[^/\n]"*"[^/\n]|"*"[^/\n]|"/"[^*\n])*
 "|"				{return tok(sym.OR, null);} 
 "*"				{return tok(sym.TIMES, null);}
 
-[a-zA-Z][a-zA-Z0-9_]+	{return tok(sym.ID); }
-. 				{ err("Illgal character: " + yytext()); }
+
+
+[a-zA-Z][a-zA-Z0-9_]+	{return tok(sym.ID,yytext()); }
+[0-9]|[1-9][0-9]+		{return tok(sym.INT, new Integer(yytext())); }
+. 				{ err("Illegal character: " + yytext()); }
 
 
