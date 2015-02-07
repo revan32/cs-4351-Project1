@@ -1,7 +1,7 @@
 package Parse;
 import ErrorMsg.ErrorMsg;
 
-%% 
+%%
 
 %implements Lexer
 %function nextToken
@@ -48,6 +48,12 @@ Yylex(java.io.InputStream s, ErrorMsg e) {
   errorMsg=e;
 }
 
+private int getControlOfString(String s) {
+  int i = Character.getNumericValue(s.charAt(2));
+  i = i - 9;
+  return i;
+}
+
 private char getASCIIchar(String s) {
   String ascii = s.substring(1, s.length());
   int i = Integer.parseInt(ascii);
@@ -56,7 +62,8 @@ private char getASCIIchar(String s) {
 
 private char print(String s) {
    int tempStr = s.length();
-   char newChar = s.charAt(tmp - 1);
+   char newChar = s.charAt(tempStr - 1);
+   return newChar;
 }
 
 %}
@@ -67,10 +74,10 @@ private char print(String s) {
          if (comments != 0) { err("ERROR: Comment is not closed.");}
    return tok(sym.EOF, null);
         }
-%eofval} 
+%eofval}
 
 %%
-<YYINITIAL>[" "|\t|\f]+ {}      
+<YYINITIAL>[" "|\t|\f]+ {}
 <YYINITIAL>[\n\r] {newline();}
 
 <YYINITIAL>"/*" {comments++; yybegin(COMMENT);}
@@ -103,23 +110,23 @@ private char print(String s) {
 <YYINITIAL>"-" {return tok(sym.MINUS, null);}
 <YYINITIAL>"/" {return tok(sym.DIVIDE, null);}
 
-<YYINITIAL>"(" {return tok(sym.LPAREN, null);}   
-<YYINITIAL>")" {return tok(sym.RPAREN, null);} 
-<YYINITIAL>"[" {return tok(sym.LBRACK, null);} 
-<YYINITIAL>"]" {return tok(sym.RBRACK, null);} 
-<YYINITIAL>"{" {return tok(sym.LBRACE, null);} 
+<YYINITIAL>"(" {return tok(sym.LPAREN, null);}
+<YYINITIAL>")" {return tok(sym.RPAREN, null);}
+<YYINITIAL>"[" {return tok(sym.LBRACK, null);}
+<YYINITIAL>"]" {return tok(sym.RBRACK, null);}
+<YYINITIAL>"{" {return tok(sym.LBRACE, null);}
 <YYINITIAL>"}" {return tok(sym.RBRACE, null);}
- 
-<YYINITIAL>";" {return tok(sym.SEMICOLON, null);} 
-<YYINITIAL>":" {return tok(sym.COLON, null);} 
+
+<YYINITIAL>";" {return tok(sym.SEMICOLON, null);}
+<YYINITIAL>":" {return tok(sym.COLON, null);}
 <YYINITIAL>"," {return tok(sym.COMMA, null);}
- 
-<YYINITIAL>":=" {return tok(sym.ASSIGN, null);} 
-<YYINITIAL>"=" {return tok(sym.EQ, null);}  
-<YYINITIAL>"<=" {return tok(sym.LE, null);} 
-<YYINITIAL>"<>" {return tok(sym.NEQ, null);} 
-<YYINITIAL>">" {return tok(sym.GT, null);} 
-<YYINITIAL>">=" {return tok(sym.GE, null);}  
+
+<YYINITIAL>":=" {return tok(sym.ASSIGN, null);}
+<YYINITIAL>"=" {return tok(sym.EQ, null);}
+<YYINITIAL>"<=" {return tok(sym.LE, null);}
+<YYINITIAL>"<>" {return tok(sym.NEQ, null);}
+<YYINITIAL>">" {return tok(sym.GT, null);}
+<YYINITIAL>">=" {return tok(sym.GE, null);}
 <YYINITIAL>"|" {return tok(sym.OR, null);}
 <YYINITIAL>"&" {return tok(sym.AND, null);}
 <YYINITIAL>"<" {return tok(sym.LT, null);}
@@ -131,13 +138,12 @@ private char print(String s) {
 <STRING>\\\\ {string.append("\\");}
 <STRING>[$\\\n^\\] {}
 <STRING>\\[\n|\t|\ |\f]+[^\\] {string.append(print(yytext()));}
-<STRING>"\^"[@A-Z\[\\\]\^_?] {int i = getControl(yytext()); string.append((char)i);}
-<STRING>"\"" {yybegin(YYINITIAL); strings--; tempCharPos = 0; return tok(sym.STRING, charPos, string.toString());}
+<STRING>"\^"[@A-Z\[\\\]\^_?] {int i = getControlOfString(yytext()); string.append((char)i);}
+<STRING>"\"" {yybegin(YYINITIAL); strings--; return tok(sym.STRING, string.toString());}
 <STRING>[\n] {yyline++; err("Remember that you cannot have newlines in string literals. Please use '\\' to continue to another line."); yybegin(STRING_IGNORE);}
 <STRING>. {string.append(yytext()); charPos++;}
 <STRING>\\[\n|\t|\ |\f]+[^\\] {string.append(print(yytext()));}
 <STRING>\\[0-9][0-9][0-9]+ {int i = getASCIIchar(yytext()); if (i < 256) {string.append((char)i);} else {err("ERROR: THIS IS ASCII");} yybegin(STRING);}
- 
 
 <YYINITIAL>[a-zA-Z][a-zA-Z0-9_]* {return tok(sym.ID,yytext()); }
 <YYINITIAL>[0-9]|[1-9][0-9]+ {return tok(sym.INT, new Integer(yytext())); }
@@ -157,4 +163,3 @@ private char print(String s) {
 <STRING_IGNORE>"\"" {strings = 0;}
 
 . { yyline++; err("Illegal character: " + yytext()); }
-
