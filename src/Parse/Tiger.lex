@@ -7,11 +7,19 @@ import ErrorMsg.ErrorMsg;
 %function nextToken
 %type java_cup.runtime.Symbol
 %char
+%line
+%state COMMENT
+%state SPACE
+%state STRING
+%state STRING_IGNORE
 
 %{
-int comments = 0;
-StringBuffer string;
-int in_string=0;
+private int comments = 0;
+private StringBuffer string;
+private int in_string=0;
+private int strings=0;
+private int charPos;
+private int tempCharPos;
 
 private void newline() {
   errorMsg.newline(yychar);
@@ -40,83 +48,113 @@ Yylex(java.io.InputStream s, ErrorMsg e) {
   errorMsg=e;
 }
 
+private char getASCIIchar(String s) {
+  String ascii = s.substring(1, s.length());
+  int i = Integer.parseInt(ascii);
+  return (char)i;
+}
+
+private char print(String s) {
+   int tempStr = s.length();
+   char newChar = s.charAt(tmp - 1);
+}
+
 %}
 
 %eofval{
-	{
-	 return tok(sym.EOF, null);
+  {
+         if (strings != 0) { err("ERROR: String is not closed.");}
+         if (comments != 0) { err("ERROR: Comment is not closed.");}
+   return tok(sym.EOF, null);
         }
 %eofval} 
 
-comment_text=([^/*\n]|[^*\n]"/"[^*\n]|[^/\n]"*"[^/\n]|"*"[^/\n]|"/"[^*\n])*
-3digits=[0-9][0-9][0-9]
-%state COMMENT STRING
-
-
 %%
-" "				{}
-\n				{newline();}
-<YYINITIAL>"/*"		{comments++; yybegin(COMMENT);}
+<YYINITIAL>[" "|\t|\f]+ {}      
+<YYINITIAL>[\n\r] {newline();}
 
-<COMMENT>"/*"			{comments++;}
-<COMMENT>{comment_text}	{ }
-<COMMENT>"*/"			{if (--comments == 0) { yybegin(YYINITIAL); }}
+<YYINITIAL>"/*" {comments++; yybegin(COMMENT);}
+<COMMENT>"/*" {comments++;}
+<COMMENT>[\n\r]+ {}
+<COMMENT>"*/" {if (--comments == 0) { yybegin(YYINITIAL); }}
+<COMMENT>. {}
 
+<YYINITIAL>"while" {return tok(sym.WHILE, null);}
+<YYINITIAL>"for" {return tok(sym.FOR, null);}
+<YYINITIAL>"to" {return tok(sym.TO, null);}
+<YYINITIAL>"break" {return tok(sym.BREAK, null);}
+<YYINITIAL>"let" {return tok(sym.LET, null);}
+<YYINITIAL>"in" {return tok(sym.IN, null);}
+<YYINITIAL>"end" {return tok(sym.END, null);}
+<YYINITIAL>"function" {return tok(sym.FUNCTION, null);}
+<YYINITIAL>"var" {return tok(sym.VAR, null);}
+<YYINITIAL>"type" {return tok(sym.TYPE, null);}
+<YYINITIAL>"array" {return tok(sym.ARRAY, null);}
+<YYINITIAL>"if" {return tok(sym.IF, null);}
+<YYINITIAL>"then" {return tok(sym.THEN, null);}
+<YYINITIAL>"else" {return tok(sym.ELSE, null);}
+<YYINITIAL>"do" {return tok(sym.DO, null);}
+<YYINITIAL>"of" {return tok(sym.OF, null);}
+<YYINITIAL>"nil" {return tok(sym.NIL, null);}
 
+<YYINITIAL>"*" {return tok(sym.TIMES, null);}
+<YYINITIAL>"." {return tok(sym.DOT, null);}
+<YYINITIAL>"+" {return tok(sym.PLUS, null);}
+<YYINITIAL>"-" {return tok(sym.MINUS, null);}
+<YYINITIAL>"/" {return tok(sym.DIVIDE, null);}
 
-\t				{     }
-\\{3digits}[0-9]+	{Integer ascin= new Integer(yytext().substring(1, yytext().length()));
-				return tok(sym.STRING, ascin.shortValue());}
+<YYINITIAL>"(" {return tok(sym.LPAREN, null);}   
+<YYINITIAL>")" {return tok(sym.RPAREN, null);} 
+<YYINITIAL>"[" {return tok(sym.LBRACK, null);} 
+<YYINITIAL>"]" {return tok(sym.RBRACK, null);} 
+<YYINITIAL>"{" {return tok(sym.LBRACE, null);} 
+<YYINITIAL>"}" {return tok(sym.RBRACE, null);}
+ 
+<YYINITIAL>";" {return tok(sym.SEMICOLON, null);} 
+<YYINITIAL>":" {return tok(sym.COLON, null);} 
+<YYINITIAL>"," {return tok(sym.COMMA, null);}
+ 
+<YYINITIAL>":=" {return tok(sym.ASSIGN, null);} 
+<YYINITIAL>"=" {return tok(sym.EQ, null);}  
+<YYINITIAL>"<=" {return tok(sym.LE, null);} 
+<YYINITIAL>"<>" {return tok(sym.NEQ, null);} 
+<YYINITIAL>">" {return tok(sym.GT, null);} 
+<YYINITIAL>">=" {return tok(sym.GE, null);}  
+<YYINITIAL>"|" {return tok(sym.OR, null);}
+<YYINITIAL>"&" {return tok(sym.AND, null);}
+<YYINITIAL>"<" {return tok(sym.LT, null);}
 
+<YYINITIAL>"\"" {string = new StringBuffer(); strings++; yybegin(STRING);}
+<STRING>\\t {string.append("\t");}
+<STRING>\\n {string.append("\n");}
+<STRING>\\\" {string.append("\"");}
+<STRING>\\\\ {string.append("\\");}
+<STRING>[$\\\n^\\] {}
+<STRING>\\[\n|\t|\ |\f]+[^\\] {string.append(print(yytext()));}
+<STRING>"\^"[@A-Z\[\\\]\^_?] {int i = getControl(yytext()); string.append((char)i);}
+<STRING>"\"" {yybegin(YYINITIAL); strings--; tempCharPos = 0; return tok(sym.STRING, charPos, string.toString());}
+<STRING>[\n] {yyline++; err("Remember that you cannot have newlines in string literals. Please use '\\' to continue to another line."); yybegin(STRING_IGNORE);}
+<STRING>. {string.append(yytext()); charPos++;}
+<STRING>\\[\n|\t|\ |\f]+[^\\] {string.append(print(yytext()));}
+<STRING>\\[0-9][0-9][0-9]+ {int i = getASCIIchar(yytext()); if (i < 256) {string.append((char)i);} else {err("ERROR: THIS IS ASCII");} yybegin(STRING);}
+ 
 
-"while" 			{return tok(sym.WHILE, null);}
-"for"				{return tok(sym.FOR, null);}
-"to"				{return tok(sym.TO, null);}
-"break"			{return tok(sym.BREAK, null);}
-"let"				{return tok(sym.LET, null);}
-"in"				{return tok(sym.IN, null);}
-"end"				{return tok(sym.END, null);}
-"function"			{return tok(sym.FUNCTION, null);}
-"var"				{return tok(sym.VAR, null);}
-"type"				{return tok(sym.TYPE, null);}
-"array"			{return tok(sym.ARRAY, null);}
-"if"				{return tok(sym.IF, null);}
-"then"				{return tok(sym.THEN, null);}
-"else"				{return tok(sym.ELSE, null);}
-"do"				{return tok(sym.DO, null);}
-"of"				{return tok(sym.OF, null);}
-"nil"				{return tok(sym.NIL, null);}
+<YYINITIAL>[a-zA-Z][a-zA-Z0-9_]* {return tok(sym.ID,yytext()); }
+<YYINITIAL>[0-9]|[1-9][0-9]+ {return tok(sym.INT, new Integer(yytext())); }
 
+<SPACE>[" "|\t|\f]+ {}
+<SPACE>\\ {yybegin(STRING);}
 
-","				{return tok(sym.COMMA, null);}
-"("				{return tok(sym.LPAREN, null);}
-")"				{return tok(sym.RPAREN, null);}
-"="				{return tok(sym.EQ, null);}
-"&"				{return tok(sym.AND, null);}   
-"+"				{return tok(sym.PLUS, null);} 
-"["				{return tok(sym.LBRACK, null);} 
-"]"				{return tok(sym.RBRACK, null);} 
-"-"				{return tok(sym.MINUS, null);} 
-"."				{return tok(sym.DOT, null);} 
-"/"				{return tok(sym.DIVIDE, null);} 
-":"				{return tok(sym.COLON, null);} 
-","				{return tok(sym.COMMA, null);} 
-":="				{return tok(sym.ASSIGN, null);} 
-";"				{return tok(sym.SEMICOLON, null);} 
-"<"				{return tok(sym.LT, null);} 
-"<="				{return tok(sym.LE, null);} 
-"<>"				{return tok(sym.NEQ, null);} 
-">"				{return tok(sym.GT, null);} 
-">="				{return tok(sym.GE, null);} 
-"{"				{return tok(sym.LBRACE, null);} 
-"}"				{return tok(sym.RBRACE, null);} 
-"|"				{return tok(sym.OR, null);} 
-"*"				{return tok(sym.TIMES, null);}
+<STRING_IGNORE>[\n\r\f] {strings = 1;}
+<STRING_IGNORE>\\n {}
+<STRING_IGNORE>\\t {}
+<STRING_IGNORE>\\\\ {}
+<STRING_IGNORE>"\\\"" {}
+<STRING_IGNORE>[^\"\\\n]* {}
+<STRING_IGNORE>\\[\n|\t|\ |\f]+[^\\] {}
+<STRING_IGNORE>\\[0-9][0-9][0-9] {}
+<STRING_IGNORE>\\. {}
+<STRING_IGNORE>"\"" {strings = 0;}
 
-
-
-[a-zA-Z][a-zA-Z0-9_]+	{return tok(sym.ID,yytext()); }
-[0-9]|[1-9][0-9]+		{return tok(sym.INT, new Integer(yytext())); }
-. 				{ err("Illegal character: " + yytext()); }
-
+. { yyline++; err("Illegal character: " + yytext()); }
 
